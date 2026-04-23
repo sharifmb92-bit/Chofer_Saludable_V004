@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ruta 80</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#2c3e50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2854/2854923.png">
+
+    <style>
+        :root { --primary: #2c3e50; --accent: #27ae60; --bg: #f8f9fa; --card-bg: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: #333; padding-bottom: 40px; }
+        header { background: linear-gradient(135deg, var(--primary), #4ca1af); color: white; padding: 25px 20px; border-radius: 0 0 25px 25px; text-align: center; }
+        .tabs { display: flex; justify-content: space-around; background: white; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow-x: auto; }
+        .tab-btn { border: none; background: none; font-weight: bold; color: #7f8c8d; padding: 15px; cursor: pointer; white-space: nowrap; }
+        .tab-btn.active { color: var(--accent); border-bottom: 3px solid var(--accent); }
+        .container { padding: 20px; display: none; }
+        .container.active { display: block; }
+        .card { background: var(--card-bg); border-radius: 20px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .btn { width: 100%; border: none; padding: 15px; border-radius: 15px; color: white; font-weight: bold; font-size: 1rem; margin-top: 10px; cursor: pointer; }
+        .btn-water { background: #3498db; }
+        .btn-snack { background: var(--accent); }
+        .btn-danger { background: #e74c3c; }
+        .item { padding: 12px 0; border-bottom: 1px solid #eee; display: flex; align-items: center; }
+        .icon { margin-right: 12px; font-size: 1.3rem; }
+        .progress-container { background: #ecf0f1; border-radius: 10px; height: 12px; margin: 10px 0; }
+        .progress-bar { background: #3498db; height: 100%; border-radius: 10px; width: 0%; transition: 0.5s; }
+        .mood-selector { display: flex; justify-content: space-between; margin-top: 15px; }
+        .mood-btn { font-size: 2rem; filter: grayscale(100%); cursor: pointer; transition: 0.3s; background: none; border: none; }
+        .mood-btn.active { filter: grayscale(0%); transform: scale(1.2); }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 style="margin:0">Ruta 80 🚌</h1>
+    <p style="opacity: 0.9">Peso: 87kg → Meta: 80kg</p>
+</header>
+
+<div class="tabs">
+    <button class="tab-btn active" onclick="openTab('hoy')">HOY</button>
+    <button class="tab-btn" onclick="openTab('dieta')">DIETA</button>
+    <button class="tab-btn" onclick="openTab('entreno')">ENTRENO</button>
+    <button class="tab-btn" onclick="openTab('espalda')">ESPALDA</button>
+</div>
+
+<div id="hoy" class="container active">
+    <div class="card">
+        <h2>💧 Hidratación</h2>
+        <div class="progress-container"><div id="wBar" class="progress-bar"></div></div>
+        <p>Vasos: <span id="wCount">0</span> / 8</p>
+        <button class="btn btn-water" onclick="addW()">+ Registrar Vaso</button>
+    </div>
+    <div class="card">
+        <h2>🍏 Control de Saciedad</h2>
+        <p id="snackTime">Último snack: Ninguno</p>
+        <button class="btn btn-snack" onclick="logS()">Registrar Snack Saludable</button>
+    </div>
+</div>
+
+<div id="dieta" class="container">
+    <div class="card">
+        <h2 id="dia-titulo-dieta">🍴 Menú</h2>
+        <div id="menu-contenido"></div>
+    </div>
+</div>
+
+<div id="entreno" class="container">
+    <div class="card">
+        <h2 id="dia-titulo-entreno">💪 Entrenamiento</h2>
+        <div id="ejercicio-contenido"></div>
+    </div>
+</div>
+
+<div id="espalda" class="container">
+    <div class="card">
+        <h2>📊 Diario de Espalda</h2>
+        <div class="mood-selector">
+            <button class="mood-btn" id="m1" onclick="setMood(1)">😞</button>
+            <button class="mood-btn" id="m2" onclick="setMood(2)">😐</button>
+            <button class="mood-btn" id="m3" onclick="setMood(3)">🙂</button>
+        </div>
+        <p id="mood-desc" style="text-align:center; margin-top:15px; font-weight:bold;"></p>
+    </div>
+    <div class="card" style="background: #fff3cd; border-left: 5px solid #f1c40f;">
+        <h2 style="color: #856404;">🧘 Alivio Rápido</h2>
+        <button class="btn btn-danger" onclick="alert('EJERCICIO: Manos en lumbares, arquea suavemente hacia atrás 10 veces.')">S.O.S. CONDUCTOR</button>
+    </div>
+</div>
+
+<script>
+    // REGISTRO DEL SERVICE WORKER PARA INSTALACIÓN
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    let data = JSON.parse(localStorage.getItem('ruta80Data')) || { 
+        water: 0, lastSnack: 'Ninguno', lastUpdate: new Date().toDateString(), mood: 0 
+    };
+
+    if (data.lastUpdate !== new Date().toDateString()) {
+        data.water = 0; data.mood = 0; data.lastUpdate = new Date().toDateString();
+    }
+
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const hoyIdx = new Date().getDay();
+    const nombreDia = dias[hoyIdx];
+
+    const planes = {
+        dieta: {
+            "Lunes": ["🍳 Tortilla espinacas", "🍎 Manzana", "🍗 Pollo y Brócoli", "🐟 Pescado blanco"],
+            "Martes": ["🥣 Avena con nueces", "🍐 Pera", "🥩 Ternera y ensalada", "🥗 Ensalada de Atún"],
+            "Miércoles": ["🍳 Huevos revueltos", "🥜 Almendras", "🍛 Lentejas vegetales", "🍗 Pechuga de Pavo"],
+            "Jueves": ["🥑 Pan con aguacate", "🍌 Plátano", "🐟 Salmón espárragos", "🥣 Caldo y pollo"],
+            "Viernes": ["🍳 Tortilla de queso", "🍏 Manzana", "🍗 Pollo y ensalada", "🐟 Pescado plancha"],
+            "Sábado": ["🥣 Yogur con chía", "🥜 Nueces", "🥘 Paella de marisco", "🥗 Ensalada mixta"],
+            "Domingo": ["🍳 Huevos con tomate", "🍓 Fruta variada", "🍗 Pollo con pimientos", "🥗 Cena ligera libre"]
+        },
+        entreno: {
+            "Lunes": ["🐱 Gato-Camello (10)", "🌉 Puente Glúteo (12)", "🪑 Sentadillas (12)", "🧱 Flexiones pared (12)"],
+            "Martes": ["🧘 Estiramiento Lumbar", "🚶 Caminar rápido", "🔄 Movilidad cuello"],
+            "Miércoles": ["🐱 Gato-Camello (10)", "🌉 Puente Glúteo (15)", "🪑 Sentadillas (15)", "⏱️ Plancha (30s)"],
+            "Jueves": ["🧘 Estiramiento Isquios", "🚶 Caminata activa", "🔄 Movilidad hombros"],
+            "Viernes": ["🐱 Gato-Camello (10)", "🌉 Puente Glúteo (12)", "🪑 Sentadillas (12)", "🧱 Flexiones pared (12)"],
+            "Sábado": ["🚶 Paseo (30 min)", "🧘 Estiramientos PRO"],
+            "Domingo": ["🛌 Descanso Total", "🧘 Lumbar suave"]
+        }
+    };
+
+    function updateUI() {
+        document.getElementById('wCount').innerText = data.water;
+        document.getElementById('wBar').style.width = (data.water / 8 * 100) + '%';
+        document.getElementById('snackTime').innerText = "Último snack: " + data.lastSnack;
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+        if(data.mood > 0) {
+            document.getElementById('m' + data.mood).classList.add('active');
+            const msgs = ["", "Hoy ha sido duro. ¡Estira!", "Cansancio normal.", "¡Genial! Sin dolor."];
+            document.getElementById('mood-desc').innerText = msgs[data.mood];
+        }
+        localStorage.setItem('ruta80Data', JSON.stringify(data));
+    }
+
+    function addW() { if(data.water < 8) data.water++; updateUI(); }
+    function logS() { data.lastSnack = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); updateUI(); }
+    function setMood(m) { data.mood = m; updateUI(); }
+    function openTab(tabName) {
+        document.querySelectorAll('.container').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+        document.getElementById(tabName).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    function cargarContenidoDiario() {
+        document.getElementById('dia-titulo-dieta').innerText = "🍴 Menú: " + nombreDia;
+        document.getElementById('dia-titulo-entreno').innerText = "💪 Rutina: " + nombreDia;
+        const iconSet = ["🌅", "🍎", "☀️", "🌙"];
+        document.getElementById('menu-contenido').innerHTML = planes.dieta[nombreDia].map((item, i) => 
+            `<div class="item"><span class="icon">${iconSet[i]}</span> ${item}</div>`).join('');
+        document.getElementById('ejercicio-contenido').innerHTML = planes.entreno[nombreDia].map(item => 
+            `<div class="item"><span class="icon">✅</span> ${item}</div>`).join('');
+    }
+
+    cargarContenidoDiario();
+    updateUI();
+</script>
+</body>
+</html>
